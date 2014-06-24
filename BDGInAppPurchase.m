@@ -9,7 +9,7 @@
 
 #import "BDGInAppPurchase.h"
 
-@interface BDGInAppPurchase () <SKRequestDelegate, SKProductsRequestDelegate, SKPaymentTransactionObserver>
+@interface BDGInAppPurchase () <SKRequestDelegate, SKProductsRequestDelegate, SKPaymentTransactionObserver, SKStoreProductViewControllerDelegate>
 
 @end
 
@@ -38,6 +38,59 @@
 -(void)restoreIAP
 {
     [[SKPaymentQueue defaultQueue] restoreCompletedTransactions];
+}
+
+-(void)buyApp:(NSString *)appID
+{
+    NSString *urlStr = [NSString stringWithFormat:@"http://itunes.apple.com/app/id%@", appID];
+    [self openURL:urlStr];
+}
+
+-(void)reviewApp:(NSString *)appID
+{
+    NSString *urlStr = [NSString stringWithFormat:@"itms-apps://ax.itunes.apple.com/WebObjects/MZStore.woa/wa/viewContentsUserReviews?type=Purple+Software&id=%@", appID];
+    [self openURL:urlStr];
+}
+
+-(void)buyAppInApp:(NSString *)appID
+{
+    SKStoreProductViewController *storeProductViewController = [[SKStoreProductViewController alloc] init];
+    [storeProductViewController setDelegate:self];
+    [storeProductViewController loadProductWithParameters:@{SKStoreProductParameterITunesItemIdentifier:appID} completionBlock:^(BOOL result, NSError *error) {
+        if(error) {
+            NSLog(@"BDGInAppPurchase error: %@, User Info %@", [error description], [error userInfo]);
+            if([self.delegate respondsToSelector:@selector(didFailIAS)]) {
+                [self.delegate didFailIAS];
+            }
+        }
+        else {
+            if([self.delegate respondsToSelector:@selector(presentVC:)]) {
+                [self.delegate presentVC:storeProductViewController];
+            }
+        }
+    }];
+}
+
+#pragma mark OpenURL
+
+-(void)openURL:(NSString *)urlStr
+{
+    if(self.affiliateID.length>0) {
+        urlStr = [NSString stringWithFormat:@"%@?at=%@", urlStr, self.affiliateID];
+    }
+    [[UIApplication sharedApplication] openURL:[NSURL URLWithString:urlStr]];
+}
+
+#pragma mark SKStoreProductViewControllerDelegate methods
+
+-(void)productViewControllerDidFinish:(SKStoreProductViewController *)viewController
+{
+    if([self.delegate respondsToSelector:@selector(dismissVC)]) {
+        [self.delegate dismissVC];
+    }
+    if([self.delegate respondsToSelector:@selector(didEndIAS)]) {
+        [self.delegate didEndIAS];
+    }
 }
 
 #pragma mark - SKProductsRequestDelegate methods
